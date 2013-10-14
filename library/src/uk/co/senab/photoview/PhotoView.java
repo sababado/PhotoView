@@ -161,8 +161,18 @@ public class PhotoView extends ImageView implements IPhotoView {
     @Override
     // setImageBitmap calls through to this method
     public void setImageDrawable(Drawable drawable) {
+        setImageDrawable(drawable,true);
+    }
+
+    /**
+     * Call this instead of {@link #setImageDrawable(android.graphics.drawable.Drawable)} to replace the current image drawable with a new one.
+     * Passing in false for <code>updateAttacher</code> assumes that the replacement is the exact same size as the drawable it is replacing.
+     * @param drawable Drawable to set
+     * @param updateAttacher true to update bounds, false to not.
+     */
+    public void setImageDrawable(Drawable drawable, final boolean updateAttacher) {
         super.setImageDrawable(drawable);
-        if (null != mAttacher) {
+        if (null != mAttacher && updateAttacher) {
             mAttacher.update();
         }
     }

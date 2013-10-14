@@ -63,12 +63,24 @@ public class PhotoViewAttacher implements IPhotoView, View.OnTouchListener,
     static final int EDGE_RIGHT = 1;
     static final int EDGE_BOTH = 2;
 
-    public static final float DEFAULT_MAX_SCALE = 3.0f;
-    public static final float DEFAULT_MID_SCALE = 1.75f;
+    //	public static final float DEFAULT_MID_SCALE = 1.75f;
     public static final float DEFAULT_MIN_SCALE = 1.0f;
 
+    /**
+     * Zoom levels mapped to scale factors.
+     */
+    public static final float[] ZOOM_LEVELS =
+            {
+                    DEFAULT_MIN_SCALE,
+                    DEFAULT_MIN_SCALE * 2f,
+                    DEFAULT_MIN_SCALE * 4f,
+                    DEFAULT_MIN_SCALE * 8f,
+                    DEFAULT_MIN_SCALE * 16f
+            };
+    public static final float DEFAULT_MAX_SCALE = ZOOM_LEVELS[ZOOM_LEVELS.length - 1];
+
     private float mMinScale = DEFAULT_MIN_SCALE;
-    private float mMidScale = DEFAULT_MID_SCALE;
+    private float mMidScale = ZOOM_LEVELS[(int) (ZOOM_LEVELS.length / 2 + 0.5f)];
     private float mMaxScale = DEFAULT_MAX_SCALE;
 
     private boolean mAllowParentInterceptOnEdge = true;
@@ -142,6 +154,7 @@ public class PhotoViewAttacher implements IPhotoView, View.OnTouchListener,
     private OnPhotoTapListener mPhotoTapListener;
     private OnViewTapListener mViewTapListener;
     private OnLongClickListener mLongClickListener;
+    private OnStateChangeListener mOnStateChangeListener;
 
     private int mIvTop, mIvRight, mIvBottom, mIvLeft;
     private FlingRunnable mCurrentFlingRunnable;
@@ -324,6 +337,38 @@ public class PhotoViewAttacher implements IPhotoView, View.OnTouchListener,
         return FloatMath.sqrt((float) Math.pow(getValue(mSuppMatrix, Matrix.MSCALE_X), 2) + (float) Math.pow(getValue(mSuppMatrix, Matrix.MSKEW_Y), 2));
     }
 
+    /**
+     * Get the current zoom level that the map is displaying at.
+     *
+     * @return A zoom level from {@link #getMinZoomLevel()} to {@link #getMaxZoomLevel()}.
+     */
+    public final int getZoomLevel() {
+        final float scale = getScale();
+        for (int i = 1; i < ZOOM_LEVELS.length; i++) {
+            if (scale < ZOOM_LEVELS[i])
+                return i;
+        }
+        return ZOOM_LEVELS.length;
+    }
+
+    /**
+     * Get the maximum level that the map will zoom to.
+     *
+     * @return {@link #ZOOM_LEVELS}.length
+     */
+    public static final int getMaxZoomLevel() {
+        return ZOOM_LEVELS.length;
+    }
+
+    /**
+     * Get the minimum level that the map will zoom to.
+     *
+     * @return 1.
+     */
+    public final static int getMinZoomLevel() {
+        return 1;
+    }
+
     @Override
     public final ScaleType getScaleType() {
         return mScaleType;
@@ -443,8 +488,15 @@ public class PhotoViewAttacher implements IPhotoView, View.OnTouchListener,
         }
 
         if (getScale() < mMaxScale || scaleFactor < 1f) {
+            final int oldZoomLevel = getZoomLevel();
+
             mSuppMatrix.postScale(scaleFactor, scaleFactor, focusX, focusY);
             checkAndDisplayMatrix();
+
+            final int newZoomLevel = getZoomLevel();
+            if(oldZoomLevel != newZoomLevel && mOnStateChangeListener != null) {
+                mOnStateChangeListener.onZoomLevelChange(oldZoomLevel, newZoomLevel);
+            }
         }
     }
 
@@ -591,6 +643,10 @@ public class PhotoViewAttacher implements IPhotoView, View.OnTouchListener,
     @Override
     public final void setOnViewTapListener(OnViewTapListener listener) {
         mViewTapListener = listener;
+    }
+
+    public final void setOnStateChangeListener(OnStateChangeListener listener) {
+        mOnStateChangeListener = listener;
     }
 
     @Override
@@ -990,13 +1046,17 @@ public class PhotoViewAttacher implements IPhotoView, View.OnTouchListener,
             if (imageView == null) {
                 return;
             }
-
+            final int oldZoomLevel = getZoomLevel();
             float t = interpolate();
             float scale = mZoomStart + t * (mZoomEnd - mZoomStart);
             float deltaScale = scale / getScale();
 
             mSuppMatrix.postScale(deltaScale, deltaScale, mFocalX, mFocalY);
             checkAndDisplayMatrix();
+            final int newZoomLevel = getZoomLevel();
+            if(oldZoomLevel != newZoomLevel && mOnStateChangeListener != null) {
+                mOnStateChangeListener.onZoomLevelChange(oldZoomLevel, newZoomLevel);
+            }
 
             // We haven't hit our target scale yet, so post ourselves again
             if (t < 1f) {
