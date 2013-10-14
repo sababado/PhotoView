@@ -1,23 +1,31 @@
 buildscript {
-  repositories {
-    mavenCentral()
-  }
+    repositories {
+        mavenCentral()
+    }
 
-  dependencies {
-    classpath 'com.android.tools.build:gradle:0.6.+'
-  }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:0.6.+'
+    }
+}
+
+def isReleaseBuild() {
+    return version.contains("SNAPSHOT") == false
 }
 
 allprojects {
-  group = 'uk.co.senab.photoview'
-  version = '1.2.2-SHAPSHOT'
+    group = GROUP
+    version = VERSION_NAME
 
-  repositories {
-    mavenCentral()
-  }
+    repositories {
+        mavenLocal()
+        maven {
+            url "$MAAS_NEXUS_SERVER_URL/content/groups/public/"
+        }
+        mavenCentral()
+    }
 
-  tasks.withType(JavaCompile) {
-    options.encoding = "UTF-8"
-  }
+    tasks.withType(JavaCompile) {
+        options.encoding = "UTF-8"
+    }
 }
 

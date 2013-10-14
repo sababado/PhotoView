@@ -31,4 +31,4 @@ proguard.cfg
 .gradle
 gradle
 build
-
+gradle.properties
