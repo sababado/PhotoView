@@ -138,6 +138,6 @@ public class CupcakeGestureDetector implements GestureDetector {
             }
         }
 
-        return true;
+        return false;
     }
 }
