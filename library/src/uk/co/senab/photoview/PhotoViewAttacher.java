@@ -494,7 +494,7 @@ public class PhotoViewAttacher implements IPhotoView, View.OnTouchListener,
             checkAndDisplayMatrix();
 
             final int newZoomLevel = getZoomLevel();
-            if(oldZoomLevel != newZoomLevel && mOnStateChangeListener != null) {
+            if (oldZoomLevel != newZoomLevel && mOnStateChangeListener != null) {
                 mOnStateChangeListener.onZoomLevelChange(oldZoomLevel, newZoomLevel);
             }
         }
@@ -721,6 +721,36 @@ public class PhotoViewAttacher implements IPhotoView, View.OnTouchListener,
                 // Reset the Matrix...
                 resetMatrix();
             }
+        }
+    }
+
+    /**
+     * Animate to the center of the image.
+     */
+    public void centerImage() {
+        final RectF rect = getDisplayRect();
+
+        if (rect != null) {
+            centerImage(rect.centerX(), rect.centerY(), getScale());
+        }
+    }
+
+    /**
+     * Animate to a target X and Y point on the image.
+     *
+     * @param x           X coordinate to animate to.
+     * @param y           Y coordinate to animate to.
+     * @param targetScale Target scale to zoom to.
+     */
+    public void centerImage(final float x, final float y, final float targetScale) {
+        final RectF rect = getDisplayRect();
+        final ImageView img = getImageView();
+
+        if (null != rect) {
+            final float currentScale = getScale();
+            img.post(new AnimatedPanAndZoomRunnable(currentScale, targetScale,
+                    (img.getMeasuredWidth() / 2f), (img.getMeasuredHeight() / 2f),
+                    x, y));
         }
     }
 
@@ -1054,7 +1084,7 @@ public class PhotoViewAttacher implements IPhotoView, View.OnTouchListener,
             mSuppMatrix.postScale(deltaScale, deltaScale, mFocalX, mFocalY);
             checkAndDisplayMatrix();
             final int newZoomLevel = getZoomLevel();
-            if(oldZoomLevel != newZoomLevel && mOnStateChangeListener != null) {
+            if (oldZoomLevel != newZoomLevel && mOnStateChangeListener != null) {
                 mOnStateChangeListener.onZoomLevelChange(oldZoomLevel, newZoomLevel);
             }
 
@@ -1159,6 +1189,74 @@ public class PhotoViewAttacher implements IPhotoView, View.OnTouchListener,
                 // Post On animation
                 Compat.postOnAnimation(imageView, this);
             }
+        }
+    }
+
+    private class AnimatedPanAndZoomRunnable implements Runnable {
+
+        private final float mTargetX, mTargetY;
+        private float mStartX, mStartY;
+        private final long mStartTime;
+        private final float mZoomStart, mZoomEnd;
+
+        public AnimatedPanAndZoomRunnable(final float currentZoom, final float targetZoom,
+                                          final float targetX, final float targetY,
+                                          final float startX, final float startY) {
+            mTargetX = targetX;
+            mTargetY = targetY;
+            mStartTime = System.currentTimeMillis();
+            mZoomStart = currentZoom;
+            mZoomEnd = targetZoom;
+            mStartX = startX;
+            mStartY = startY;
+        }
+
+        @Override
+        public void run() {
+            ImageView imageView = getImageView();
+            if (imageView == null) {
+                return;
+            }
+            final int oldZoomLevel = getZoomLevel();
+            final float t = interpolate();
+            //"t" is a percentage, the progress from start to finish.
+            //it should be used to get the current scale/pan amount.
+
+            //scale
+            //TODO This scaling code doesn't work just yet. The calculation is slightly off.
+//            float scale = mZoomStart + t * (mZoomEnd - mZoomStart);
+//            float deltaScale = scale / getScale();
+//            if (deltaScale != 1) {
+//                final RectF rect = getDisplayRect();
+//                mSuppMatrix.postScale(deltaScale, deltaScale, rect.centerX(), rect.centerY());
+//                mStartX /= deltaScale;
+//                mStartY /= deltaScale;
+//            }
+
+            //pan
+            float dx = t * (mTargetX - mStartX);
+            float dy = t * (mTargetY - mStartY);
+            mSuppMatrix.postTranslate(dx, dy);
+            // offset start value.
+            mStartX += dx;
+            mStartY += dy;
+
+            checkAndDisplayMatrix();
+            final int newZoomLevel = getZoomLevel();
+            if (oldZoomLevel != newZoomLevel && mOnStateChangeListener != null) {
+                mOnStateChangeListener.onZoomLevelChange(oldZoomLevel, newZoomLevel);
+            }
+            // We haven't hit our target scale yet, so post ourselves again
+            if (t < 1f) {
+                Compat.postOnAnimation(imageView, this);
+            }
+        }
+
+        private float interpolate() {
+            float t = 1f * (System.currentTimeMillis() - mStartTime) / ZOOM_DURATION;
+            t = Math.min(1f, t);
+            t = sInterpolator.getInterpolation(t);
+            return t;
         }
     }
 }
